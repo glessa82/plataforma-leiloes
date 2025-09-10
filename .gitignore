@@ -1,0 +1,13 @@
+# Ignorar pastas de dependências
+/backend/node_modules/
+/frontend/node_modules/
+
+# Ignorar arquivos de ambiente com senhas
+/backend/.env
+
+# Ignorar logs de depuração
+npm-debug.log*
+
+# Ignorar arquivos temporários de sistemas operacionais
+.DS_Store
+*.log
