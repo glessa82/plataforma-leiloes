@@ -7,23 +7,14 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingAuction, setEditingAuction] = useState(null);
+  const [filters, setFilters] = useState({ city: '', neighborhood: '', status: '' });
 
-  // 1. Novo estado para os filtros
-  const [filters, setFilters] = useState({
-    city: '',
-    neighborhood: '',
-    status: ''
-  });
-
-  // 2. Função de busca agora aceita filtros
   const fetchAuctions = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Constrói os parâmetros de busca
       const params = new URLSearchParams(filters).toString();
       const url = `http://localhost:3000/auctions?${params}`;
-
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Falha ao buscar os dados.');
@@ -39,7 +30,7 @@ function App() {
 
   useEffect(() => {
     fetchAuctions();
-  }, []);
+  }, [filters]); // Adicionado `filters` para que a busca seja re-executada quando o filtro mudar.
 
   const handleAuctionAdded = () => {
     fetchAuctions();
@@ -58,43 +49,37 @@ function App() {
     fetchAuctions();
   };
   
-  // 3. Funções para lidar com as mudanças e envio dos filtros
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      [name]: value
-    }));
+    setFilters(prevFilters => ({ ...prevFilters, [name]: value }));
   };
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    fetchAuctions(); // Chama a função de busca com os novos filtros
+    fetchAuctions();
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ textAlign: 'center' }}>Plataforma de Gestão de Leilões</h1>
+    <div className="container mx-auto p-4 md:p-8 font-sans">
+      <h1 className="text-3xl font-bold text-center my-6">Plataforma de Gestão de Leilões</h1>
       
-      {/* Formulário de cadastro/edição */}
       <AuctionForm 
         onAuctionAdded={handleAuctionAdded} 
         editingAuction={editingAuction}
         onAuctionUpdated={handleAuctionUpdated}
       />
       
-      <hr style={{ margin: '40px 0' }} />
+      <hr className="my-10 border-gray-300" />
       
-      {/* 4. Novo formulário para os filtros */}
-      <h2>Filtrar Oportunidades</h2>
-      <form onSubmit={handleFilterSubmit} style={{ marginBottom: '20px' }}>
+      <h2 className="text-2xl font-semibold mb-4">Filtrar Oportunidades</h2>
+      <form onSubmit={handleFilterSubmit} className="mb-8 flex flex-wrap gap-4 items-center">
         <input 
           type="text" 
           name="city" 
           value={filters.city} 
           onChange={handleFilterChange} 
           placeholder="Filtrar por cidade" 
-          style={{ marginRight: '10px', padding: '8px' }}
+          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[150px]"
         />
         <input 
           type="text" 
@@ -102,13 +87,13 @@ function App() {
           value={filters.neighborhood} 
           onChange={handleFilterChange} 
           placeholder="Filtrar por bairro" 
-          style={{ marginRight: '10px', padding: '8px' }}
+          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[150px]"
         />
         <select 
           name="status" 
           value={filters.status} 
           onChange={handleFilterChange} 
-          style={{ marginRight: '10px', padding: '8px' }}
+          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[100px]"
         >
           <option value="">Status...</option>
           <option value="pending">Pendente</option>
@@ -116,14 +101,13 @@ function App() {
           <option value="won">Ganho</option>
           <option value="sold">Vendido</option>
         </select>
-        <button type="submit" style={{ padding: '8px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        <button type="submit" className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
           Aplicar Filtros
         </button>
       </form>
 
-      <hr style={{ margin: '40px 0' }} />
+      <hr className="my-10 border-gray-300" />
       
-      {/* Lista de leilões */}
       <AuctionsList 
         auctions={auctions} 
         isLoading={isLoading} 
