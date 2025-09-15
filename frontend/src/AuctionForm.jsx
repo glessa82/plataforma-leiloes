@@ -15,6 +15,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({}); // Novo estado para validação
 
   useEffect(() => {
     if (editingAuction) {
@@ -82,6 +83,46 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
     calculateProfit();
   }, [formData]);
 
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Validação de campos obrigatórios
+    if (!formData.title) newErrors.title = 'Título é obrigatório.';
+    if (!formData.location.city) newErrors['location.city'] = 'Cidade é obrigatória.';
+    if (!formData.location.fullAddress) newErrors['location.fullAddress'] = 'Endereço é obrigatório.';
+    if (!formData.auctionInfo.adLink) newErrors['auctionInfo.adLink'] = 'Link do anúncio é obrigatório.';
+    if (!formData.auctionInfo.firstAuction.date) newErrors['auctionInfo.firstAuction.date'] = 'Data do 1º leilão é obrigatória.';
+    if (formData.auctionInfo.firstAuction.price <= 0) newErrors['auctionInfo.firstAuction.price'] = 'O valor deve ser maior que zero.';
+    
+    // Validação condicional para o 2º leilão
+    if (formData.auctionInfo.secondAuction.date && !formData.auctionInfo.secondAuction.price) {
+      newErrors['auctionInfo.secondAuction.price'] = 'O valor do 2º leilão é obrigatório se a data for preenchida.';
+    }
+    if (formData.auctionInfo.secondAuction.price && !formData.auctionInfo.secondAuction.date) {
+      newErrors['auctionInfo.secondAuction.date'] = 'A data do 2º leilão é obrigatória se o valor for preenchido.';
+    }
+
+    // Validação de valores não negativos para custos
+    for (const key in formData.biddingInfo) {
+      if (formData.biddingInfo[key] < 0) {
+        newErrors[`biddingInfo.${key}`] = 'O valor não pode ser negativo.';
+      }
+    }
+    for (const key in formData.postAcquisitionCosts) {
+      if (formData.postAcquisitionCosts[key] < 0) {
+        newErrors[`postAcquisitionCosts.${key}`] = 'O valor não pode ser negativo.';
+      }
+    }
+    for (const key in formData.saleInfo) {
+      if (formData.saleInfo[key] < 0) {
+        newErrors[`saleInfo.${key}`] = 'O valor não pode ser negativo.';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type } = e.target;
     const [mainKey, subKey, subKey2] = name.split('.');
@@ -92,35 +133,52 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
       if (isNaN(finalValue)) finalValue = 0;
     }
 
-    if (subKey2) {
-      setFormData(prevData => ({
-        ...prevData,
-        [mainKey]: {
+    setFormData(prevData => {
+      let newData = { ...prevData };
+      if (subKey2) {
+        newData[mainKey] = {
           ...prevData[mainKey],
           [subKey]: {
             ...prevData[mainKey][subKey],
             [subKey2]: finalValue
           }
-        }
-      }));
-    } else if (subKey) {
-      setFormData(prevData => ({
-        ...prevData,
-        [mainKey]: {
+        };
+      } else if (subKey) {
+        newData[mainKey] = {
           ...prevData[mainKey],
           [subKey]: finalValue
-        }
-      }));
-    } else {
-      setFormData(prevData => ({
-        ...prevData,
-        [name]: finalValue
-      }));
+        };
+      } else {
+        newData[name] = finalValue;
+      }
+      return newData;
+    });
+
+    // Validação em tempo real (opcional, mas recomendado)
+    // Isso valida um campo por vez para não poluir a tela no início
+    const tempErrors = {};
+    if (type === 'number' && finalValue < 0) {
+        tempErrors[name] = 'O valor não pode ser negativo.';
+    } else if (value.trim() === '' && e.target.required) {
+        tempErrors[name] = 'Este campo é obrigatório.';
     }
+
+    setErrors(prevErrors => ({
+        ...prevErrors,
+        [name]: tempErrors[name]
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Roda a validação completa antes de enviar
+    const isValid = validateForm();
+    if (!isValid) {
+        setError('Por favor, corrija os erros no formulário.');
+        return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -165,6 +223,12 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
   
   const formTitle = editingAuction ? 'Editar Leilão' : 'Cadastrar Nova Oportunidade';
 
+  const renderError = (field) => {
+    return errors[field] ? (
+      <p className="text-red-500 text-sm mt-1">{errors[field]}</p>
+    ) : null;
+  };
+
   return (
     <div className="bg-white shadow-md rounded-lg p-6 mb-8">
       <h2 className="text-2xl font-semibold mb-6">{formTitle}</h2>
@@ -180,8 +244,28 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('title')}
           </div>
           
+          <div className="col-span-full">
+            <h3 className="text-lg font-medium text-gray-800 my-4">Informações Gerais</h3>
+          </div>
+          
+          <div>
+            <label className="block text-gray-700 font-medium mb-2">Status:</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="pending">Pendente</option>
+              <option value="active">Ativo</option>
+              <option value="won">Ganho</option>
+              <option value="sold">Vendido</option>
+            </select>
+          </div>
+
           <div className="col-span-full">
             <h3 className="text-lg font-medium text-gray-800 my-4">Localização</h3>
           </div>
@@ -196,6 +280,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('location.city')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Bairro (Opcional):</label>
@@ -217,6 +302,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('location.fullAddress')}
           </div>
 
           <div className="col-span-full">
@@ -233,6 +319,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('auctionInfo.adLink')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Data/Hora do 1º Leilão:</label>
@@ -244,6 +331,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('auctionInfo.firstAuction.date')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Valor do 1º Leilão:</label>
@@ -255,6 +343,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('auctionInfo.firstAuction.price')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Data/Hora do 2º Leilão (Opcional):</label>
@@ -265,6 +354,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               onChange={handleInputChange}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('auctionInfo.secondAuction.date')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Valor do 2º Leilão (Opcional):</label>
@@ -275,6 +365,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               onChange={handleInputChange}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('auctionInfo.secondAuction.price')}
           </div>
           
           <div className="col-span-full">
@@ -287,30 +378,37 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
           <div>
             <label className="block text-gray-700 font-medium mb-2">Preço de Arrematação:</label>
             <input type="number" name="biddingInfo.acquisitionPrice" value={formData.biddingInfo.acquisitionPrice} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.acquisitionPrice')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Comissão do Leiloeiro:</label>
             <input type="number" name="biddingInfo.leiloeiroCommission" value={formData.biddingInfo.leiloeiroCommission} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.leiloeiroCommission')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">ITBI:</label>
             <input type="number" name="biddingInfo.itbiValue" value={formData.biddingInfo.itbiValue} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.itbiValue')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Taxa de Registro:</label>
             <input type="number" name="biddingInfo.registrationFee" value={formData.biddingInfo.registrationFee} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.registrationFee')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Custos com Advogado:</label>
             <input type="number" name="biddingInfo.lawyerFee" value={formData.biddingInfo.lawyerFee} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.lawyerFee')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Custo da Reforma:</label>
             <input type="number" name="biddingInfo.renovationCost" value={formData.biddingInfo.renovationCost} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.renovationCost')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Custos Adicionais da Arrematação:</label>
             <input type="number" name="biddingInfo.additionalCosts" value={formData.biddingInfo.additionalCosts} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('biddingInfo.additionalCosts')}
           </div>
           
           <div className="col-span-full">
@@ -319,18 +417,22 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
           <div>
             <label className="block text-gray-700 font-medium mb-2">Período de Manutenção (meses):</label>
             <input type="number" name="postAcquisitionCosts.maintenancePeriodInMonths" value={formData.postAcquisitionCosts.maintenancePeriodInMonths} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('postAcquisitionCosts.maintenancePeriodInMonths')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">IPTU Mensal:</label>
             <input type="number" name="postAcquisitionCosts.monthlyIptu" value={formData.postAcquisitionCosts.monthlyIptu} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('postAcquisitionCosts.monthlyIptu')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Condomínio Mensal:</label>
             <input type="number" name="postAcquisitionCosts.monthlyCondoFee" value={formData.postAcquisitionCosts.monthlyCondoFee} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('postAcquisitionCosts.monthlyCondoFee')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Outros Custos Mensais:</label>
             <input type="number" name="postAcquisitionCosts.otherMonthlyCosts" value={formData.postAcquisitionCosts.otherMonthlyCosts} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('postAcquisitionCosts.otherMonthlyCosts')}
           </div>
           
           <div className="col-span-full">
@@ -339,14 +441,17 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
           <div>
             <label className="block text-gray-700 font-medium mb-2">Preço de Venda:</label>
             <input type="number" name="saleInfo.salePrice" value={formData.saleInfo.salePrice} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('saleInfo.salePrice')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Comissão do Corretor:</label>
             <input type="number" name="saleInfo.brokerCommission" value={formData.saleInfo.brokerCommission} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('saleInfo.brokerCommission')}
           </div>
           <div>
             <label className="block text-gray-700 font-medium mb-2">Imposto de Renda sobre a Venda:</label>
             <input type="number" name="saleInfo.incomeTaxOnSale" value={formData.saleInfo.incomeTaxOnSale} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {renderError('saleInfo.incomeTaxOnSale')}
           </div>
           
         </div>
@@ -356,6 +461,8 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
           <span className="text-2xl font-bold text-green-600">R$ {totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         
+        {error && <p className="text-red-500 mt-4 mb-4 font-bold">{error}</p>}
+
         <div className="mt-8 flex items-center gap-4">
           <button 
             type="submit" 
@@ -378,7 +485,6 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
       </form>
 
       {success && <p className="text-green-500 mt-4">Leilão {editingAuction ? 'atualizado' : 'cadastrado'} com sucesso!</p>}
-      {error && <p className="text-red-500 mt-4">Ocorreu um erro: {error}</p>}
     </div>
   );
 }

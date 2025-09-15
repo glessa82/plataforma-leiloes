@@ -1,23 +1,33 @@
 import { useState, useEffect } from 'react';
-import AuctionsList from './AuctionsList';
 import AuctionForm from './AuctionForm';
+import AuctionsList from './AuctionsList';
+import AuctionDetails from './AuctionDetails';
+import Filters from './Filters';
+import Header from './Header';
 
 function App() {
-  const [auctions, setAuctions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [refreshAuctions, setRefreshAuctions] = useState(false);
   const [editingAuction, setEditingAuction] = useState(null);
-  const [filters, setFilters] = useState({ city: '', neighborhood: '', status: '' });
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [selectedAuctionId, setSelectedAuctionId] = useState(null);
+  const [auctions, setAuctions] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    city: '',
+    status: '',
+    minPrice: '',
+    maxPrice: ''
+  });
 
   const fetchAuctions = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams(filters).toString();
-      const url = `http://localhost:3000/auctions?${params}`;
-      const response = await fetch(url);
+      const query = new URLSearchParams(filters).toString();
+      const response = await fetch(`http://localhost:3000/auctions?${query}`);
       if (!response.ok) {
-        throw new Error('Falha ao buscar os dados.');
+        throw new Error('Falha ao carregar os leilões.');
       }
       const data = await response.json();
       setAuctions(data);
@@ -30,91 +40,97 @@ function App() {
 
   useEffect(() => {
     fetchAuctions();
-  }, [filters]); // Adicionado `filters` para que a busca seja re-executada quando o filtro mudar.
+  }, [refreshAuctions, filters]);
 
-  const handleAuctionAdded = () => {
-    fetchAuctions();
+  const handleEdit = (auctionId) => {
+    const auctionToEdit = auctions.find(a => a._id === auctionId);
+    setEditingAuction(auctionToEdit);
+    setIsFormVisible(true);
+    setSelectedAuctionId(null);
   };
-  
-  const handleAuctionDeleted = () => {
-    fetchAuctions();
-  };
-  
-  const handleAuctionEdit = (auction) => {
-    setEditingAuction(auction);
-  };
-  
-  const handleAuctionUpdated = () => {
+
+  const handleViewDetails = (auctionId) => {
+    setSelectedAuctionId(auctionId);
     setEditingAuction(null);
-    fetchAuctions();
-  };
-  
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prevFilters => ({ ...prevFilters, [name]: value }));
+    setIsFormVisible(false);
   };
 
-  const handleFilterSubmit = (e) => {
-    e.preventDefault();
-    fetchAuctions();
+  const handleBackToList = () => {
+    setSelectedAuctionId(null);
+    setEditingAuction(null);
   };
+
+  const handleDelete = async (auctionId) => {
+    if (window.confirm('Tem certeza de que deseja excluir este leilão?')) {
+        try {
+            const response = await fetch(`http://localhost:3000/auctions/${auctionId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                throw new Error('Falha ao excluir o leilão.');
+            }
+            setSelectedAuctionId(null);
+            setRefreshAuctions(!refreshAuctions);
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+  };
+
+  const currentAuction = selectedAuctionId ? auctions.find(a => a._id === selectedAuctionId) : null;
 
   return (
-    <div className="container mx-auto p-4 md:p-8 font-sans">
-      <h1 className="text-3xl font-bold text-center my-6">Plataforma de Gestão de Leilões</h1>
-      
-      <AuctionForm 
-        onAuctionAdded={handleAuctionAdded} 
-        editingAuction={editingAuction}
-        onAuctionUpdated={handleAuctionUpdated}
-      />
-      
-      <hr className="my-10 border-gray-300" />
-      
-      <h2 className="text-2xl font-semibold mb-4">Filtrar Oportunidades</h2>
-      <form onSubmit={handleFilterSubmit} className="mb-8 flex flex-wrap gap-4 items-center">
-        <input 
-          type="text" 
-          name="city" 
-          value={filters.city} 
-          onChange={handleFilterChange} 
-          placeholder="Filtrar por cidade" 
-          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[150px]"
-        />
-        <input 
-          type="text" 
-          name="neighborhood" 
-          value={filters.neighborhood} 
-          onChange={handleFilterChange} 
-          placeholder="Filtrar por bairro" 
-          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[150px]"
-        />
-        <select 
-          name="status" 
-          value={filters.status} 
-          onChange={handleFilterChange} 
-          className="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[100px]"
-        >
-          <option value="">Status...</option>
-          <option value="pending">Pendente</option>
-          <option value="active">Ativo</option>
-          <option value="won">Ganho</option>
-          <option value="sold">Vendido</option>
-        </select>
-        <button type="submit" className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-          Aplicar Filtros
-        </button>
-      </form>
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
+      <Header />
+      <main className="container mx-auto p-4 max-w-7xl w-full">
+        {!isFormVisible && !selectedAuctionId && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => {
+                setIsFormVisible(true);
+                setEditingAuction(null);
+              }}
+              className="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+            >
+              Adicionar Novo Leilão
+            </button>
+          </div>
+        )}
 
-      <hr className="my-10 border-gray-300" />
-      
-      <AuctionsList 
-        auctions={auctions} 
-        isLoading={isLoading} 
-        error={error} 
-        onAuctionDeleted={handleAuctionDeleted} 
-        onAuctionEdit={handleAuctionEdit}
-      />
+        {isFormVisible ? (
+          <AuctionForm
+            onAuctionAdded={() => {
+              setIsFormVisible(false);
+              setRefreshAuctions(!refreshAuctions);
+            }}
+            editingAuction={editingAuction}
+            onAuctionUpdated={() => {
+              setIsFormVisible(false);
+              setEditingAuction(null);
+              setRefreshAuctions(!refreshAuctions);
+            }}
+          />
+        ) : selectedAuctionId ? (
+          <AuctionDetails 
+            auction={currentAuction} 
+            onBackToList={handleBackToList}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <>
+            <Filters filters={filters} onFilterChange={setFilters} onSearch={fetchAuctions} />
+            <AuctionsList
+              auctions={auctions}
+              isLoading={isLoading}
+              error={error}
+              onEdit={handleEdit}
+              onDelete={() => setRefreshAuctions(!refreshAuctions)}
+              onViewDetails={handleViewDetails}
+            />
+          </>
+        )}
+      </main>
     </div>
   );
 }
