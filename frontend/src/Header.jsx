@@ -1,10 +1,20 @@
 import React from 'react';
 
-function Header() {
+// O componente agora recebe as props isAuthenticated e onLogout
+function Header({ isAuthenticated, onLogout }) {
   return (
-    <header className="w-full bg-blue-700 text-white p-4 shadow-md">
-      <div className="container mx-auto max-w-7xl flex justify-between items-center">
-        <h1 className="text-xl font-bold">Gerenciador de Leilões</h1>
+    <header className="bg-white shadow-md p-4 mb-6 sticky top-0 z-50">
+      <div className="container mx-auto flex justify-between items-center max-w-7xl">
+        <h1 className="text-3xl font-bold text-gray-800">Gerenciador de Leilões</h1>
+        {/* Renderiza o botão de Sair se o usuário estiver autenticado */}
+        {isAuthenticated && (
+          <button
+            onClick={onLogout}
+            className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+          >
+            Sair
+          </button>
+        )}
       </div>
     </header>
   );

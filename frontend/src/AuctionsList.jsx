@@ -32,13 +32,26 @@ function AuctionsList({ auctions, isLoading, error, onEdit, onDelete, onViewDeta
 
     if (window.confirm(`Tem certeza de que deseja excluir ${selectedAuctions.length} leilão(ões)?`)) {
       try {
+        const token = localStorage.getItem('token'); // Get the token
+        if (!token) {
+          alert("Você precisa estar logado para excluir leilões.");
+          return;
+        }
+
         await Promise.all(selectedAuctions.map(id => 
-          fetch(`http://localhost:3000/auctions/${id}`, { method: 'DELETE' })
+          fetch(`http://localhost:3000/auctions/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}` // Add the token to the header
+            }
+          })
         ));
+        
         setSelectedAuctions([]);
         onDelete();
       } catch (err) {
         console.error("Falha ao excluir o(s) leilão(ões).", err);
+        alert("Falha ao excluir. Por favor, tente novamente."); // Show a user-friendly alert
       }
     }
   };
@@ -76,7 +89,7 @@ function AuctionsList({ auctions, isLoading, error, onEdit, onDelete, onViewDeta
         <table className="min-w-full table-auto border-collapse">
           <thead>
             <tr className="bg-gray-100 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-              <th className="p-4 border-b-2 border-gray-200"></th> {/* Checkbox */}
+              <th className="p-4 border-b-2 border-gray-200"></th>{/* Checkbox */}
               <th className="p-4 border-b-2 border-gray-200">Título</th>
               <th className="p-4 border-b-2 border-gray-200">Cidade</th>
               <th className="p-4 border-b-2 border-gray-200">1ª Data</th>
@@ -102,12 +115,12 @@ function AuctionsList({ auctions, isLoading, error, onEdit, onDelete, onViewDeta
                 <td className="p-4 text-green-600 font-semibold">R$ {(auction.profit || 0).toLocaleString('pt-BR')}</td>
                 <td className="p-4">{statusMap[auction.status] || auction.status}</td>
                 <td className="p-4">
-                    <button 
-                        onClick={() => handleViewClick(auction._id)}
-                        className="text-blue-600 hover:underline font-medium"
-                    >
-                        Ver Detalhes
-                    </button>
+                  <button 
+                    onClick={() => handleViewClick(auction._id)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    Ver Detalhes
+                  </button>
                 </td>
               </tr>
             ))}

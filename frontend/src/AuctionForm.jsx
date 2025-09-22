@@ -15,31 +15,57 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [errors, setErrors] = useState({}); // Novo estado para validação
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (editingAuction) {
-      const formatDateTime = (dateString) => dateString ? new Date(dateString).toISOString().slice(0, 16) : '';
+      const formatDateTime = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16);
+      };
       
-      setFormData({
-        ...editingAuction,
-        location: editingAuction.location || {},
+      const newFormData = {
+        title: editingAuction.title || '',
+        location: {
+          city: editingAuction.location?.city || '',
+          neighborhood: editingAuction.location?.neighborhood || '',
+          fullAddress: editingAuction.location?.fullAddress || ''
+        },
         auctionInfo: {
-          ...(editingAuction.auctionInfo || {}),
+          adLink: editingAuction.auctionInfo?.adLink || '',
           firstAuction: {
-            ...(editingAuction.auctionInfo?.firstAuction || {}),
-            date: formatDateTime(editingAuction.auctionInfo?.firstAuction?.date)
+            date: formatDateTime(editingAuction.auctionInfo?.firstAuction?.date),
+            price: editingAuction.auctionInfo?.firstAuction?.price ?? 0
           },
           secondAuction: {
-            ...(editingAuction.auctionInfo?.secondAuction || {}),
-            date: formatDateTime(editingAuction.auctionInfo?.secondAuction?.date)
+            date: formatDateTime(editingAuction.auctionInfo?.secondAuction?.date),
+            price: editingAuction.auctionInfo?.secondAuction?.price ?? 0
           }
         },
-        biddingInfo: editingAuction.biddingInfo || { acquisitionPrice: 0, leiloeiroCommission: 0, itbiValue: 0, registrationFee: 0, lawyerFee: 0, renovationCost: 0, additionalCosts: 0 },
-        postAcquisitionCosts: editingAuction.postAcquisitionCosts || { maintenancePeriodInMonths: 0, monthlyIptu: 0, monthlyCondoFee: 0, otherMonthlyCosts: 0 },
-        saleInfo: editingAuction.saleInfo || { salePrice: 0, brokerCommission: 0, incomeTaxOnSale: 0 },
+        biddingInfo: {
+          acquisitionPrice: editingAuction.biddingInfo?.acquisitionPrice ?? 0,
+          leiloeiroCommission: editingAuction.biddingInfo?.leiloeiroCommission ?? 0,
+          itbiValue: editingAuction.biddingInfo?.itbiValue ?? 0,
+          registrationFee: editingAuction.biddingInfo?.registrationFee ?? 0,
+          lawyerFee: editingAuction.biddingInfo?.lawyerFee ?? 0,
+          renovationCost: editingAuction.biddingInfo?.renovationCost ?? 0,
+          additionalCosts: editingAuction.biddingInfo?.additionalCosts ?? 0
+        },
+        postAcquisitionCosts: {
+          maintenancePeriodInMonths: editingAuction.postAcquisitionCosts?.maintenancePeriodInMonths ?? 0,
+          monthlyIptu: editingAuction.postAcquisitionCosts?.monthlyIptu ?? 0,
+          monthlyCondoFee: editingAuction.postAcquisitionCosts?.monthlyCondoFee ?? 0,
+          otherMonthlyCosts: editingAuction.postAcquisitionCosts?.otherMonthlyCosts ?? 0
+        },
+        saleInfo: {
+          salePrice: editingAuction.saleInfo?.salePrice ?? 0,
+          brokerCommission: editingAuction.saleInfo?.brokerCommission ?? 0,
+          incomeTaxOnSale: editingAuction.saleInfo?.incomeTaxOnSale ?? 0
+        },
         status: editingAuction.status || 'pending',
-      });
+      };
+      setFormData(newFormData);
     } else {
       setFormData({
         title: '',
@@ -86,7 +112,6 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
   const validateForm = () => {
     const newErrors = {};
     
-    // Validação de campos obrigatórios
     if (!formData.title) newErrors.title = 'Título é obrigatório.';
     if (!formData.location.city) newErrors['location.city'] = 'Cidade é obrigatória.';
     if (!formData.location.fullAddress) newErrors['location.fullAddress'] = 'Endereço é obrigatório.';
@@ -94,30 +119,24 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
     if (!formData.auctionInfo.firstAuction.date) newErrors['auctionInfo.firstAuction.date'] = 'Data do 1º leilão é obrigatória.';
     if (formData.auctionInfo.firstAuction.price <= 0) newErrors['auctionInfo.firstAuction.price'] = 'O valor deve ser maior que zero.';
     
-    // Validação condicional para o 2º leilão
-    if (formData.auctionInfo.secondAuction.date && !formData.auctionInfo.secondAuction.price) {
-      newErrors['auctionInfo.secondAuction.price'] = 'O valor do 2º leilão é obrigatório se a data for preenchida.';
+    if (formData.auctionInfo.secondAuction.date && formData.auctionInfo.secondAuction.price <= 0) {
+      newErrors['auctionInfo.secondAuction.price'] = 'O valor do 2º leilão é obrigatório e deve ser maior que zero se a data for preenchida.';
     }
-    if (formData.auctionInfo.secondAuction.price && !formData.auctionInfo.secondAuction.date) {
+    if (formData.auctionInfo.secondAuction.price > 0 && !formData.auctionInfo.secondAuction.date) {
       newErrors['auctionInfo.secondAuction.date'] = 'A data do 2º leilão é obrigatória se o valor for preenchido.';
     }
 
-    // Validação de valores não negativos para custos
-    for (const key in formData.biddingInfo) {
-      if (formData.biddingInfo[key] < 0) {
-        newErrors[`biddingInfo.${key}`] = 'O valor não pode ser negativo.';
+    const checkNegativeValues = (obj, prefix) => {
+      for (const key in obj) {
+        if (typeof obj[key] === 'number' && obj[key] < 0) {
+          newErrors[`${prefix}.${key}`] = 'O valor não pode ser negativo.';
+        }
       }
-    }
-    for (const key in formData.postAcquisitionCosts) {
-      if (formData.postAcquisitionCosts[key] < 0) {
-        newErrors[`postAcquisitionCosts.${key}`] = 'O valor não pode ser negativo.';
-      }
-    }
-    for (const key in formData.saleInfo) {
-      if (formData.saleInfo[key] < 0) {
-        newErrors[`saleInfo.${key}`] = 'O valor não pode ser negativo.';
-      }
-    }
+    };
+
+    checkNegativeValues(formData.biddingInfo, 'biddingInfo');
+    checkNegativeValues(formData.postAcquisitionCosts, 'postAcquisitionCosts');
+    checkNegativeValues(formData.saleInfo, 'saleInfo');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -129,8 +148,10 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
 
     let finalValue = value;
     if (type === 'number') {
-      finalValue = parseFloat(value);
-      if (isNaN(finalValue)) finalValue = 0;
+      // O problema está aqui. O valor 'value' pode ser uma string vazia ''
+      // O React espera um número, mas recebe uma string.
+      // A correção é transformar a string vazia em 0 ou null, ou simplesmente um número.
+      finalValue = value === '' ? 0 : parseFloat(value);
     }
 
     setFormData(prevData => {
@@ -154,15 +175,13 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
       return newData;
     });
 
-    // Validação em tempo real (opcional, mas recomendado)
-    // Isso valida um campo por vez para não poluir a tela no início
     const tempErrors = {};
     if (type === 'number' && finalValue < 0) {
-        tempErrors[name] = 'O valor não pode ser negativo.';
-    } else if (value.trim() === '' && e.target.required) {
-        tempErrors[name] = 'Este campo é obrigatório.';
+      tempErrors[name] = 'O valor não pode ser negativo.';
+    } else if (e.target.required && (typeof finalValue === 'string' && finalValue.trim() === '')) {
+      tempErrors[name] = 'Este campo é obrigatório.';
     }
-
+    
     setErrors(prevErrors => ({
         ...prevErrors,
         [name]: tempErrors[name]
@@ -172,11 +191,17 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Roda a validação completa antes de enviar
     const isValid = validateForm();
     if (!isValid) {
-        setError('Por favor, corrija os erros no formulário.');
-        return;
+      setError('Por favor, corrija os erros no formulário.');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Você precisa estar logado para realizar esta ação.');
+      setLoading(false);
+      return;
     }
 
     setLoading(true);
@@ -184,9 +209,32 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
     setSuccess(false);
 
     try {
+      const { biddingInfo, postAcquisitionCosts, saleInfo } = formData;
+      
+      const totalCost = 
+        (parseFloat(biddingInfo.acquisitionPrice) || 0) + 
+        (parseFloat(biddingInfo.leiloeiroCommission) || 0) +
+        (parseFloat(biddingInfo.itbiValue) || 0) +
+        (parseFloat(biddingInfo.registrationFee) || 0) +
+        (parseFloat(biddingInfo.lawyerFee) || 0) +
+        (parseFloat(biddingInfo.renovationCost) || 0) +
+        (parseFloat(biddingInfo.additionalCosts) || 0) +
+        ((parseFloat(postAcquisitionCosts.maintenancePeriodInMonths) || 0) * (
+          (parseFloat(postAcquisitionCosts.monthlyIptu) || 0) +
+          (parseFloat(postAcquisitionCosts.monthlyCondoFee) || 0) +
+          (parseFloat(postAcquisitionCosts.otherMonthlyCosts) || 0)
+        ));
+        
+      const totalSale = 
+        (parseFloat(saleInfo.salePrice) || 0) -
+        (parseFloat(saleInfo.brokerCommission) || 0) -
+        (parseFloat(saleInfo.incomeTaxOnSale) || 0);
+      
+      const calculatedProfit = totalSale - totalCost;
+
       const payload = {
         ...formData,
-        profit: totalProfit
+        profit: calculatedProfit,
       };
       
       const url = editingAuction 
@@ -197,13 +245,15 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
       const response = await fetch(url, {
         method: method,
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        throw new Error(`Falha ao ${editingAuction ? 'atualizar' : 'cadastrar'} o leilão.`);
+        const errorText = await response.text();
+        throw new Error(`Falha ao ${editingAuction ? 'atualizar' : 'cadastrar'} o leilão: ${errorText}`);
       }
       
       setSuccess(true);
@@ -291,6 +341,7 @@ function AuctionForm({ onAuctionAdded, editingAuction, onAuctionUpdated }) {
               onChange={handleInputChange}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {renderError('location.neighborhood')}
           </div>
           <div className="col-span-full">
             <label className="block text-gray-700 font-medium mb-2">Endereço Completo:</label>

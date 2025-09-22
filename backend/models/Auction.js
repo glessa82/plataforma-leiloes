@@ -126,6 +126,8 @@ const auctionSchema = new mongoose.Schema({
     enum: ['pending', 'active', 'won', 'sold'],
     default: 'pending',
   },
+
+   profit: Number,
   
   // O Mongoose adiciona automaticamente a data de criação
   createdAt: {

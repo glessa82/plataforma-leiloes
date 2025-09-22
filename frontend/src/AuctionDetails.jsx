@@ -34,6 +34,13 @@ const AuctionDetails = ({ auction, onBackToList, onEdit, onDelete }) => {
     </div>
   );
 
+    const statusMap = {
+    pending: 'Pendente',
+    active: 'Ativo',
+    won: 'Ganho',
+    sold: 'Vendido',
+  };
+
   const profitValue = auction.profit || 0;
   const profitColorClass = profitValue >= 0 ? 'text-green-600' : 'text-red-600';
 
@@ -149,7 +156,7 @@ const AuctionDetails = ({ auction, onBackToList, onEdit, onDelete }) => {
       </div>
       
       <div className="mb-6">
-        <p className="text-gray-600">Status: <span className="font-semibold">{auction.status}</span></p>
+        <p className="text-gray-600">Status: <span className="font-semibold">{statusMap[auction.status] || auction.status}</span></p>
         <p className="text-gray-600">Lucro Total Estimado: <span className={`font-bold ${profitColorClass}`}>{formatCurrency(profitValue)}</span></p>
       </div>
       
